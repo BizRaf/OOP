@@ -2,7 +2,8 @@
 using namespace std;
 
 int main() {
-	cout << "He110!\n";
+	Start();
 	return 0;
 }
+
 
