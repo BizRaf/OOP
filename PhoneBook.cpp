@@ -374,6 +374,17 @@ Recording* PhoneBook::GetRecording(
 	}
 	return nullptr;
 }
+Recording* PhoneBook::GetRecording(int index) {
+	if (index < 1 or index > Recordings.size())
+		return nullptr;
+
+	int i = 1;
+	for (list<Recording*>::iterator iter = Recordings.begin(); iter != Recordings.end(); iter++) {
+		if (i == index)
+			return *iter;
+		i++;
+	}
+}
 
 void PhoneBook::Print() {
 	list<Recording*>::iterator iter;

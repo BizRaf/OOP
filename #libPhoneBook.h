@@ -102,6 +102,8 @@ public:
 		string dateOfBirth,
 		string email,
 		string phoneNumbers);
+	Recording* GetRecording(int index);
+	const list<Recording*> GetAllRecordings() { return Recordings; };
 
 	void Print();
 	void Rewrite(string path);
