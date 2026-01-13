@@ -267,15 +267,9 @@ int PhoneBookManager::Start() {
             ChangePage(PAGE::EDIT);
             });
 
-        //QLabel* spin_label = new QLabel("Choose a recording by clicking on its number");
-        //panel_layout->addWidget(spin_label, 0, Qt::AlignBottom);
-        //QSpinBox* spin = new QSpinBox();
-        //panel_layout->addWidget(spin);
-
         QPushButton* change_btn = new QPushButton("Change");
         panel_layout->addWidget(change_btn);
         QObject::connect(change_btn, &QPushButton::clicked, [this]() {
-            //CurrentRecording = CurrentBook->GetRecording(spin->value());
             CurrentRecording = GetRecordingFromTableView();
             if (CurrentRecording != nullptr)
                 ChangePage(PAGE::EDIT);
@@ -283,7 +277,6 @@ int PhoneBookManager::Start() {
         QPushButton* remove_btn = new QPushButton("Remove");
         panel_layout->addWidget(remove_btn);
         QObject::connect(remove_btn, &QPushButton::clicked, [this]() {
-            //CurrentRecording = CurrentBook->GetRecording(spin->value());
             CurrentRecording = GetRecordingFromTableView();
             if (CurrentRecording != nullptr) {
                 CurrentBook->RemoveRecording(CurrentRecording);
@@ -600,4 +593,5 @@ PhoneBook* QFileReadPhoneBook(QString path) {
     }
 
     return output;
+
 }
