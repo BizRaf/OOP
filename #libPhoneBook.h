@@ -44,18 +44,18 @@ private:
 	string email;
 	list<string> phoneNumbers;
 
-	bool CheckName(string);
 	void NormalizeName(string&);
-
-	bool CheckDateOfBirth(string);
-	bool CheckEmail(string);
-	bool CheckPhoneNumber(string);
 
 public:
 	Recording();
 	Recording(string firstName, string lastName, string email, string phoneNumber);
 	Recording(Recording& recording);
 	~Recording();
+
+	static bool CheckName(string);
+	static bool CheckDateOfBirth(string);
+	static bool CheckEmail(string, string);
+	static bool CheckPhoneNumber(string);
 
 	void SetFirstName(string);
 	void SetLastName(string);
@@ -73,6 +73,7 @@ public:
 
 	void AddPhoneNumber(string);
 	void RemovePhoneNumber(string);
+	void RemoveEveryPhoneNumber() { phoneNumbers.clear(); };
 	list<string> GetPhoneNumbers() { return phoneNumbers; };
 	bool DoesContainPhoneNumber(string);
 
@@ -102,6 +103,8 @@ public:
 		string dateOfBirth,
 		string email,
 		string phoneNumbers);
+	Recording* GetRecording(int index);
+	const list<Recording*> GetAllRecordings() { return Recordings; };
 
 	void Print();
 	void Rewrite(string path);
