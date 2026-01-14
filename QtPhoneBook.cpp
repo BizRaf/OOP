@@ -135,8 +135,8 @@ bool PhoneBookManager::CheckRecordingFields(fieldStruct fields) {
     istringstream iss(fields.phones);
     string phone_number;
     while (getline(iss, phone_number)) {
-        if (Recording::CheckPhoneNumber(phone_number))
-            return true;
+        if (!Recording::CheckPhoneNumber(phone_number))
+            return false;
     }
     return (
         Recording::CheckName(fields.firstName) and
@@ -225,6 +225,12 @@ void PhoneBookManager::ReadFromBD(QString tablet) {
     CurrentBook = new PhoneBook();
 
     QSqlQuery query("SELECT first_name, middle_name, last_name, address, email, birth_date, phones FROM " + tablet);
+
+    if (!query.next()) {
+        cout << "Error: couldn't find tablet \n";
+        cout << "Generating new phonebook\n";
+        return;
+    }
 
     while (query.next()) {
         Recording* rec = new Recording(
@@ -499,7 +505,8 @@ int PhoneBookManager::Start() {
             edit_layout->addWidget(submit_button);
             QObject::connect(submit_button, &QPushButton::clicked, [this, lineEdit]() {
                 CurrentBook = QFileReadPhoneBook(lineEdit->text());
-                ChangePage(PAGE::TABLET);
+                if (CurrentBook != nullptr)
+                    ChangePage(PAGE::TABLET);
                 });
             layout->addLayout(edit_layout);
         }
@@ -736,6 +743,8 @@ PhoneBook* QFileReadPhoneBook(QString path) {
         readFile.close();
     }
 
+    cout << "Error: couldn't find file \n";
+    cout << "Generating new phonebook\n";
     return output;
 }
 
