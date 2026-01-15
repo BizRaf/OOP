@@ -67,11 +67,15 @@ void PhoneBookManager::UpdateEditing() {
 
 Recording* PhoneBookManager::BuildRecording(fieldStruct fields) {
     Recording* output = new Recording(fields.firstName, fields.lastName, fields.email, "");
-    if (output != nullptr) {
+    if (output == nullptr)
+        return nullptr;
+
+    if (fields.middleName != "")
         output->SetMiddleName(fields.middleName);
+    if (fields.address != "")
         output->SetAddress(fields.address);
+    if (fields.dateOfBirth != "")
         output->SetDateOfBirth(fields.dateOfBirth);
-    }
 
     output->RemovePhoneNumber("");
     istringstream iss(fields.phones);
@@ -132,19 +136,23 @@ void PhoneBookManager::ChangePage(PAGE page) {
     stacked_widget->setCurrentIndex(page);
 }
 bool PhoneBookManager::CheckRecordingFields(fieldStruct fields) {
+    if (fields.firstName == "" || fields.lastName == "" || fields.email == "" || fields.phones == "")
+        return false;
+    
     istringstream iss(fields.phones);
     string phone_number;
     while (getline(iss, phone_number)) {
         if (!Recording::CheckPhoneNumber(phone_number))
             return false;
     }
-    return (
-        Recording::CheckName(fields.firstName) and
-        Recording::CheckName(fields.middleName) and
-        Recording::CheckName(fields.lastName) and
-        Recording::CheckDateOfBirth(fields.dateOfBirth) and
-        Recording::CheckEmail(fields.email, fields.firstName)
-        );
+
+    bool fn_check = Recording::CheckName(fields.firstName);
+    bool mn_check = fields.middleName == "" || Recording::CheckName(fields.middleName);
+    bool ln_check = Recording::CheckName(fields.lastName);
+    bool date_check = fields.dateOfBirth == "" || Recording::CheckDateOfBirth(fields.dateOfBirth);
+    bool email_check = Recording::CheckEmail(fields.email, fields.firstName);
+
+    return (fn_check || mn_check || ln_check || date_check || email_check);
 };
 
 
@@ -622,13 +630,14 @@ int PhoneBookManager::Start() {
             fields.phones = phoneEdits->GetEveryElement();
 
             if (!CheckRecordingFields(fields)) {
-                cout << "Wrong fields" << endl;
+                cout << "Error: wrong fields" << endl;
                 return;
             }
 
             if (CurrentRecording == nullptr) {
                 Recording* new_record = BuildRecording(fields);
-                CurrentBook->AddRecording(*new_record);
+                if (new_record != nullptr)
+                    CurrentBook->AddRecording(*new_record);
             }
             else {
                 if (fields.firstName != "")
