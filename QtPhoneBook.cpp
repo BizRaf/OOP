@@ -215,14 +215,6 @@ void PhoneBookManager::WriteToBD(QString tablet) {
 
         add_query.exec();
     }
-
-    //QWidget* menu = new QWidget();
-    //stacked_widget->addWidget(menu);
-    //QVBoxLayout* box = new QVBoxLayout(menu);
-    //QLabel* title = new QLabel(add_query.lastError().text());
-    //box->addWidget(title);
-    //QLabel* title1 = new QLabel(add_query.executedQuery());
-    //box->addWidget(title1);
 }
 void PhoneBookManager::ReadFromBD(QString tablet) {
     if (CurrentBook != nullptr) {
@@ -233,12 +225,6 @@ void PhoneBookManager::ReadFromBD(QString tablet) {
     CurrentBook = new PhoneBook();
 
     QSqlQuery query("SELECT first_name, middle_name, last_name, address, email, birth_date, phones FROM " + tablet);
-
-    if (!query.next()) {
-        cout << "Error: couldn't find tablet \n";
-        cout << "Generating new phonebook\n";
-        return;
-    }
 
     while (query.next()) {
         Recording* rec = new Recording(
@@ -844,4 +830,5 @@ QStringList pgArrayToStringList(QString pgArray) {
     }
 
     return result;
+
 }
