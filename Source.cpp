@@ -1,9 +1,9 @@
-#include <iostream>
-using namespace std;
+#include "#libPhoneBook.h"
+#include "#libQtPhoneBook.h"
+
 
 int main() {
-	Start();
-	return 0;
+	//Start();
+	PhoneBookManager manager;
+	return manager.Start();
 }
-
-

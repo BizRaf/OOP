@@ -110,12 +110,14 @@ bool Recording::CheckDateOfBirth(string date) {
 
 	return true;
 }
-bool Recording::CheckEmail(string email) {
+bool Recording::CheckEmail(string email, string firstName) {
 	if (email.find(firstName) == string::npos)
 		return false;
 	if (email.find('@') == string::npos)
 		return false;
-	if (*email.end() == '@')	// check domain
+	string::iterator last_char = email.end();
+	last_char--;
+	if (*(last_char) == '@')	// check domain
 		return false;
 	return true;
 }
@@ -177,7 +179,7 @@ void Recording::SetDateOfBirth(string dateOfBirth) {
 	this->dateOfBirth = dateOfBirth;
 }
 void Recording::SetEmail(string email) {
-	if (!CheckEmail(email))
+	if (!CheckEmail(email, firstName))
 		return;
 	this->email = email;
 }
@@ -265,6 +267,7 @@ PhoneBook::PhoneBook(string path) {
 			for (list<string>::iterator iter = setup_phones.begin(); iter != setup_phones.end(); iter++)
 				new_rec->AddPhoneNumber(*iter);
 			AddRecording(*new_rec);
+			setup_phones.clear();
 			i = 0;
 			continue;
 		}
@@ -373,6 +376,17 @@ Recording* PhoneBook::GetRecording(
 		return *iter;
 	}
 	return nullptr;
+}
+Recording* PhoneBook::GetRecording(int index) {
+	if (index < 1 or index > Recordings.size())
+		return nullptr;
+
+	int i = 1;
+	for (list<Recording*>::iterator iter = Recordings.begin(); iter != Recordings.end(); iter++) {
+		if (i == index)
+			return *iter;
+		i++;
+	}
 }
 
 void PhoneBook::Print() {
