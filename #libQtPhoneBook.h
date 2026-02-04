@@ -19,6 +19,8 @@
 #include <QtCore/qfile.h>
 #include <QtCore/qtextstream.h>
 
+#include <QtSql>
+
 enum PAGE {
 	MAIN = 0,
 	TABLET = 1,
@@ -27,22 +29,25 @@ enum PAGE {
 	EDIT = 4
 };
 
-enum TABLESORTED {
-	FIRST_NAME_ASC,
-	FIRST_NAME_DES,
-	MIDDLE_NAME_ASC,
-	MIDDLE_NAME_DES,
-	LAST_NAME_ASC,
-	LAST_NAME_DES,
-	ADDRESS_ASC,
-	ADDRESS_DES,
-	DATE_ASC,
-	DATE_DES,
-	EMAIL_ASC,
-	EMAIL_DES,
-	PHONES_ASC,
-	PHONES_DES,
-	NONE = 0
+enum TABLESORTEDFIELD {
+	NONE,
+	FIRST_NAME,
+	MIDDLE_NAME,
+	LAST_NAME,
+	ADDRESS_F,
+	DATE,
+	EMAIL_F,
+	PHONES
+};
+
+enum SORTORDER {
+	DESCENDING,
+	ASCENDING
+};
+
+struct tableSort {
+	TABLESORTEDFIELD field;
+	SORTORDER order;
 };
 
 struct fieldStruct {
@@ -89,6 +94,7 @@ class PhoneBookManager {
 private:
 	PhoneBook* CurrentBook;
 	Recording* CurrentRecording;
+	QSqlDatabase DataBase;
 
 	QStandardItemModel* Recordings_table;
 	QTableView* table_view;
@@ -106,6 +112,11 @@ private:
 
 	bool CheckRecordingFields(fieldStruct fields);
 
+	void ConnectToBD();
+	void WriteToBD(QString);
+	void ReadFromBD(QString);
+	void DisconnectWithBD();
+
 public:
 	PhoneBookManager() { CurrentBook = nullptr; CurrentRecording = nullptr; };
 	~PhoneBookManager() { delete CurrentBook; delete CurrentRecording; };
@@ -115,3 +126,5 @@ public:
 
 void QFileSavePhoneBook(PhoneBook*, QString path);
 PhoneBook* QFileReadPhoneBook(QString path);
+QDate ConvertStringToQDate(string dateStr);
+QStringList pgArrayToStringList(QString pgArray);

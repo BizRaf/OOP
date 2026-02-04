@@ -137,16 +137,19 @@ bool Recording::CheckPhoneNumber(string phoneNumber) {
 		case 0:
 			if (*iter == '+')
 				continue;
+			return false;
 		case 1:
 		case 4:
 			if (*iter == '(' or *iter == ')')
 				continue;
-		case 7:
-		case 9:
-			if (*iter == '-')
-				continue;
+			return false;
+		case 2:
+		case 3:
+			return false;
 		default:
-			break;
+			if (*iter == '-' && (iter + 1) != phoneNumber.end() && *(iter + 1) != '-')
+				continue;
+			return false;
 		}
 		
 		return false;

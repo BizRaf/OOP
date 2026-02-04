@@ -67,11 +67,15 @@ void PhoneBookManager::UpdateEditing() {
 
 Recording* PhoneBookManager::BuildRecording(fieldStruct fields) {
     Recording* output = new Recording(fields.firstName, fields.lastName, fields.email, "");
-    if (output != nullptr) {
+    if (output == nullptr)
+        return nullptr;
+
+    if (fields.middleName != "")
         output->SetMiddleName(fields.middleName);
+    if (fields.address != "")
         output->SetAddress(fields.address);
+    if (fields.dateOfBirth != "")
         output->SetDateOfBirth(fields.dateOfBirth);
-    }
 
     output->RemovePhoneNumber("");
     istringstream iss(fields.phones);
@@ -132,20 +136,137 @@ void PhoneBookManager::ChangePage(PAGE page) {
     stacked_widget->setCurrentIndex(page);
 }
 bool PhoneBookManager::CheckRecordingFields(fieldStruct fields) {
+    if (fields.firstName == "" || fields.lastName == "" || fields.email == "" || fields.phones == "")
+        return false;
+    
     istringstream iss(fields.phones);
     string phone_number;
     while (getline(iss, phone_number)) {
-        if (Recording::CheckPhoneNumber(phone_number))
-            return true;
+        if (!Recording::CheckPhoneNumber(phone_number))
+            return false;
     }
-    return (
-        Recording::CheckName(fields.firstName) and
-        Recording::CheckName(fields.middleName) and
-        Recording::CheckName(fields.lastName) and
-        Recording::CheckDateOfBirth(fields.dateOfBirth) and
-        Recording::CheckEmail(fields.email, fields.firstName)
-        );
+
+    bool fn_check = Recording::CheckName(fields.firstName);
+    bool mn_check = fields.middleName == "" || Recording::CheckName(fields.middleName);
+    bool ln_check = Recording::CheckName(fields.lastName);
+    bool date_check = fields.dateOfBirth == "" || Recording::CheckDateOfBirth(fields.dateOfBirth);
+    bool email_check = Recording::CheckEmail(fields.email, fields.firstName);
+
+    return (fn_check || mn_check || ln_check || date_check || email_check);
 };
+
+
+void PhoneBookManager::ConnectToBD() {
+    if (!QSqlDatabase::drivers().contains("QPSQL")) {
+        cout << "Driver error\n";
+        return;
+    }
+
+    QSqlDatabase DataBase = QSqlDatabase::addDatabase("QPSQL");
+    DataBase.setHostName("localhost");
+    DataBase.setDatabaseName("test_db");
+    DataBase.setUserName("postgres");
+    DataBase.setPassword("@dm101n");
+
+    if (!DataBase.open()) {
+        cout << "Connection error\n";
+        return;
+    }
+
+    DataBase.setConnectOptions("prepared_stmt=false");
+
+    return;
+}
+void PhoneBookManager::WriteToBD(QString tablet) {
+    if (CurrentBook == nullptr)
+        return;
+
+    DataBase.setConnectOptions("prepared_stmt=false");
+    QSqlQuery build_query("CREATE TABLE IF NOT EXISTS " + tablet + "("
+        "first_name VARCHAR(32),"
+        "middle_name VARCHAR(32),"
+        "last_name VARCHAR(32),"
+        "address VARCHAR(64),"
+        "birth_date DATE,"
+        "email VARCHAR(32),"
+        "phones VARCHAR(32)[]"
+        ")");
+    
+    QSqlQuery add_query;
+    list<Recording*> recs = CurrentBook->GetAllRecordings();
+    add_query.prepare("INSERT INTO " + tablet + " (first_name, middle_name, last_name, address, email, birth_date, phones) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7)");
+    for (list<Recording*>::iterator rec = recs.begin(); rec != recs.end(); rec++) {
+        add_query.bindValue(0, QString::fromStdString((*rec)->GetFirstName()));
+        add_query.bindValue(1, QString::fromStdString((*rec)->GetMiddleName()));
+        add_query.bindValue(2, QString::fromStdString((*rec)->GetLastName()));
+        add_query.bindValue(3, QString::fromStdString((*rec)->GetAddress()));
+        add_query.bindValue(4, QString::fromStdString((*rec)->GetEmail()));
+        add_query.bindValue(5, ConvertStringToQDate((*rec)->GetDateOfBirth()));
+
+        list<string> phones = (*rec)->GetPhoneNumbers();
+        string write_phones = "{";
+        for (list<string>::iterator phone = phones.begin(); phone != phones.end(); phone++) {
+            write_phones += ("'" + *phone + "', ");
+        }
+        write_phones.erase(write_phones.size() - 2, 2);
+        write_phones += "}";
+        add_query.bindValue(6, QString::fromStdString(write_phones));
+
+        add_query.exec();
+    }
+
+    //QWidget* menu = new QWidget();
+    //stacked_widget->addWidget(menu);
+    //QVBoxLayout* box = new QVBoxLayout(menu);
+    //QLabel* title = new QLabel(add_query.lastError().text());
+    //box->addWidget(title);
+    //QLabel* title1 = new QLabel(add_query.executedQuery());
+    //box->addWidget(title1);
+}
+void PhoneBookManager::ReadFromBD(QString tablet) {
+    if (CurrentBook != nullptr) {
+        cout << "Error: trying to overwrite PhoneBook incorrectly\n";
+        return;
+    }
+
+    CurrentBook = new PhoneBook();
+
+    QSqlQuery query("SELECT first_name, middle_name, last_name, address, email, birth_date, phones FROM " + tablet);
+
+    if (!query.next()) {
+        cout << "Error: couldn't find tablet \n";
+        cout << "Generating new phonebook\n";
+        return;
+    }
+
+    while (query.next()) {
+        Recording* rec = new Recording(
+            query.value("first_name").toString().toStdString(),
+            query.value("last_name").toString().toStdString(),
+            query.value("email").toString().toStdString(),
+            "");
+        if (rec != nullptr) {
+            rec->SetMiddleName(query.value("middle_name").toString().toStdString());
+            rec->SetAddress(query.value("address").toString().toStdString());
+            rec->SetDateOfBirth(query.value("birth_date").toDate().toString("dd.MM.yyyy").toStdString());
+        }
+
+        rec->RemovePhoneNumber("");
+        QStringList phones = pgArrayToStringList(query.value("phones").toString());
+
+        for (QStringList::iterator phone = phones.begin(); phone != phones.end(); phone++) {
+            rec->AddPhoneNumber((*phone).toStdString());
+        }
+        cout << endl;
+
+        CurrentBook->AddRecording(*rec);
+    }
+}
+void PhoneBookManager::DisconnectWithBD() {
+    DataBase.close();
+}
+
 
 QVListWidget::QVListWidget(int max_size) {
     this->max_size = max_size > 0 ? max_size : 1;
@@ -231,6 +352,8 @@ int PhoneBookManager::Start() {
 
     QVBoxLayout* canvas = new QVBoxLayout(&window);
     stacked_widget = new QStackedWidget();
+
+    ConnectToBD();
 
     // MAIN MENU 0
     {
@@ -342,25 +465,30 @@ int PhoneBookManager::Start() {
         tablet_layout->addLayout(sort_layout);
 
         QPushButton* sort_btns[7];
-        TABLESORTED* current_sort = new TABLESORTED(TABLESORTED::NONE);
+        tableSort* current_sort = new tableSort{ TABLESORTEDFIELD::NONE, SORTORDER::DESCENDING };
         for (int i = 0; i < 7; i++) {
-            sort_btns[i] = new QPushButton("V");
+            sort_btns[i] = new QPushButton("/\\");
             sort_layout->addWidget(sort_btns[i]);
-            QObject::connect(sort_btns[i], &QPushButton::clicked, [this, i, current_sort, sort_btns]() {
-                for (int j = 0; j < 7; j++)
-                    sort_btns[i]->setText("V");
-                if (*current_sort != TABLESORTED::NONE && *current_sort/ 2 == i + 1 && *current_sort ^ 1) {
-                    table_view->sortByColumn(i, Qt::SortOrder::AscendingOrder);
-                    *current_sort = static_cast<TABLESORTED>(2*i);
+            QObject::connect(sort_btns[i], &QPushButton::clicked, [this, i, current_sort, &sort_btns]() {
+                for (int j = 0; j < 7; j++){
+                    sort_btns[j]->setText("/\\");
+                }
+                if (current_sort->field == static_cast<TABLESORTEDFIELD>(i+1) and
+                    current_sort->order == SORTORDER::ASCENDING) {
+                    sort_btns[i]->setText("\\/");
+                    table_view->sortByColumn(i, Qt::SortOrder::DescendingOrder);
+                    current_sort->order = SORTORDER::DESCENDING;
                 }
                 else {
-                    sort_btns[i]->setText("^");
-                    table_view->sortByColumn(i, Qt::SortOrder::DescendingOrder);
-                    *current_sort = static_cast<TABLESORTED>(2 * i + 1);
+                    sort_btns[i]->setText("/\\");
+                    table_view->sortByColumn(i, Qt::SortOrder::AscendingOrder);
+                    current_sort->order = SORTORDER::ASCENDING;
                 }
-                cout << *current_sort << endl;
+                current_sort->field = static_cast<TABLESORTEDFIELD>(i + 1);
                 });
         }
+        QLabel* sort_label = new QLabel("Sorting");
+        sort_layout->addWidget(sort_label);
 
         tablet_layout->addWidget(table_view);
         UpdateTablet();
@@ -373,25 +501,40 @@ int PhoneBookManager::Start() {
         QWidget* menu = new QWidget();
         QVBoxLayout* layout = new QVBoxLayout(menu);
 
-        QLabel* title = new QLabel("Read phonebook from file");
-        layout->addWidget(title, 0, Qt::AlignHCenter);
+        {
+            QHBoxLayout* edit_layout = new QHBoxLayout(menu);
+            QLabel* title = new QLabel("Read phonebook from a txt-file");
+            layout->addWidget(title, 0, Qt::AlignBottom);
+            QLabel* label = new QLabel("Write path to a txt-file here");
+            edit_layout->addWidget(label);
+            QLineEdit* lineEdit = new QLineEdit();
+            edit_layout->addWidget(lineEdit);
+            QPushButton* submit_button = new QPushButton("Submit");
+            edit_layout->addWidget(submit_button);
+            QObject::connect(submit_button, &QPushButton::clicked, [this, lineEdit]() {
+                CurrentBook = QFileReadPhoneBook(lineEdit->text());
+                if (CurrentBook != nullptr)
+                    ChangePage(PAGE::TABLET);
+                });
+            layout->addLayout(edit_layout);
+        }
 
-        QHBoxLayout* edit_layout = new QHBoxLayout(menu);
-
-        QLabel* label = new QLabel("Write path to txt-file here");
-        edit_layout->addWidget(label);
-
-        QLineEdit* lineEdit = new QLineEdit();
-        edit_layout->addWidget(lineEdit);
-
-        QPushButton* submit_button = new QPushButton("Submit");
-        edit_layout->addWidget(submit_button);
-        QObject::connect(submit_button, &QPushButton::clicked, [this, lineEdit]() {
-            CurrentBook = QFileReadPhoneBook(lineEdit->text());
-            ChangePage(PAGE::TABLET);
-            });
-
-        layout->addLayout(edit_layout);
+        {
+            QHBoxLayout* edit_layout = new QHBoxLayout(menu);
+            QLabel* title = new QLabel("Read phonebook from a SQL-database");
+            layout->addWidget(title, 0, Qt::AlignBottom);
+            QLabel* label = new QLabel("Write table's name");
+            edit_layout->addWidget(label);
+            QLineEdit* lineEdit = new QLineEdit();
+            edit_layout->addWidget(lineEdit);
+            QPushButton* submit_button = new QPushButton("Submit");
+            edit_layout->addWidget(submit_button);
+            QObject::connect(submit_button, &QPushButton::clicked, [this, lineEdit]() {
+                ReadFromBD(lineEdit->text());
+                ChangePage(PAGE::TABLET);
+                });
+            layout->addLayout(edit_layout);
+        }
 
         QPushButton* exit_btn = new QPushButton("Exit");
         layout->addWidget(exit_btn);
@@ -405,21 +548,36 @@ int PhoneBookManager::Start() {
         QWidget* menu = new QWidget();
         QVBoxLayout* layout = new QVBoxLayout(menu);
 
-        QLabel* title = new QLabel("Save phonebook to file");
-        layout->addWidget(title, 0, Qt::AlignHCenter);
         {
+            QLabel* title = new QLabel("Save phonebook to a txt-file");
+            layout->addWidget(title, 0, Qt::AlignBottom);
             QHBoxLayout* edit_layout = new QHBoxLayout(menu);
-
-            QLabel* label = new QLabel("Write path to txt-file here");
+            QLabel* label = new QLabel("Write path to a txt-file here");
             edit_layout->addWidget(label);
-
             QLineEdit* lineEdit = new QLineEdit();
             edit_layout->addWidget(lineEdit);
-
             QPushButton* submit_button = new QPushButton("Submit");
             edit_layout->addWidget(submit_button);
             QObject::connect(submit_button, &QPushButton::clicked, [this, lineEdit]() {
                 QFileSavePhoneBook(CurrentBook, lineEdit->text());
+                ChangePage(PAGE::TABLET);
+                });
+
+            layout->addLayout(edit_layout);
+        }
+
+        {
+            QLabel* title = new QLabel("Save phonebook to a SQL-database");
+            layout->addWidget(title, 0, Qt::AlignBottom);
+            QHBoxLayout* edit_layout = new QHBoxLayout(menu);
+            QLabel* label = new QLabel("Write table's name");
+            edit_layout->addWidget(label);
+            QLineEdit* lineEdit = new QLineEdit();
+            edit_layout->addWidget(lineEdit);
+            QPushButton* submit_button = new QPushButton("Submit");
+            edit_layout->addWidget(submit_button);
+            QObject::connect(submit_button, &QPushButton::clicked, [this, lineEdit]() {
+                WriteToBD(lineEdit->text());
                 ChangePage(PAGE::TABLET);
                 });
 
@@ -472,13 +630,14 @@ int PhoneBookManager::Start() {
             fields.phones = phoneEdits->GetEveryElement();
 
             if (!CheckRecordingFields(fields)) {
-                cout << "Wrong fields" << endl;
+                cout << "Error: wrong fields" << endl;
                 return;
             }
 
             if (CurrentRecording == nullptr) {
                 Recording* new_record = BuildRecording(fields);
-                CurrentBook->AddRecording(*new_record);
+                if (new_record != nullptr)
+                    CurrentBook->AddRecording(*new_record);
             }
             else {
                 if (fields.firstName != "")
@@ -515,6 +674,7 @@ int PhoneBookManager::Start() {
 
     canvas->addWidget(stacked_widget);
     window.show();
+    DisconnectWithBD();
     return app.exec();
 }
 
@@ -592,6 +752,96 @@ PhoneBook* QFileReadPhoneBook(QString path) {
         readFile.close();
     }
 
+    cout << "Error: couldn't find file \n";
+    cout << "Generating new phonebook\n";
     return output;
+}
 
+QDate ConvertStringToQDate(string dateStr) {
+    QString qDateStr = QString::fromStdString(dateStr);
+
+    QStringList parts = qDateStr.split('.');
+
+    if (parts.size() != 3) {
+        return QDate();
+    }
+
+    bool okDay, okMonth, okYear;
+    int day = parts[0].toInt(&okDay);
+    int month = parts[1].toInt(&okMonth);
+    int year = parts[2].toInt(&okYear);
+
+    if (!okDay || !okMonth || !okYear) {
+        return QDate();
+    }
+    return QDate(year, month, day);
+}
+
+QStringList pgArrayToStringList(QString pgArray) {
+    QStringList result;
+
+    if (pgArray.isEmpty() || pgArray == "{}") {
+        return result;
+    }
+
+    QString content = pgArray.trimmed();
+    if (content.startsWith('{') && content.endsWith('}')) {
+        content = content.mid(1, content.length() - 2).trimmed();
+    }
+
+    if (content.isEmpty()) {
+        return result;
+    }
+
+    int pos = 0;
+    while (pos < content.length()) {
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == ',')) {
+            pos++;
+        }
+
+        if (pos >= content.length()) break;
+
+        QString element;
+        if (content[pos] == '\"') {
+            pos++;
+            while (pos < content.length() && content[pos] != '\"') {
+                if (content[pos] == '\\' && pos + 1 < content.length()) {
+                    pos++;
+                    element.append(content[pos]);
+                }
+                else {
+                    element.append(content[pos]);
+                }
+                pos++;
+            }
+            pos++;
+        }
+        else if (content[pos] == '\'') {
+            pos++;
+            while (pos < content.length() && content[pos] != '\'') {
+                if (content[pos] == '\'' && pos + 1 < content.length() && content[pos + 1] == '\'') {
+                    element.append('\'');
+                    pos += 2;
+                }
+                else {
+                    element.append(content[pos]);
+                    pos++;
+                }
+            }
+            pos++;
+        }
+        else {
+            while (pos < content.length() && content[pos] != ',') {
+                element.append(content[pos]);
+                pos++;
+            }
+            element = element.trimmed();
+        }
+
+        if (!element.isEmpty()) {
+            result.append(element);
+        }
+    }
+
+    return result;
 }
